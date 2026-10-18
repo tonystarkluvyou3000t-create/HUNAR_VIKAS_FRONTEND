@@ -1,0 +1,73 @@
+services:
+  # 1. Flask Backend Service
+  - type: web
+    name: hunar-vikas-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT wsgi:app
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: AUTH_ENV
+        value: production
+      - key: AUTH_DATABASE_URL
+        sync: false
+      - key: AUTH_SECRET_KEY
+        sync: false
+      - key: AUTH_APP_BASE_URL
+        sync: false
+      - key: AUTH_ALLOWED_ORIGINS
+        sync: false
+      - key: AUTH_COOKIE_SECURE
+        value: "true"
+      - key: AUTH_COOKIE_SAMESITE
+        value: Lax
+      - key: AUTH_MAIL_BACKEND
+        value: resend
+      - key: AUTH_MAIL_ASYNC
+        value: "true"
+      - key: AUTH_MAIL_FROM
+        sync: false
+      - key: AUTH_RESEND_API_KEY
+        sync: false
+      - key: AUTH_RESEND_API_URL
+        value: https://api.resend.com/emails
+
+  # 2. Combined Static Frontend Shell
+  - type: web
+    name: hunar-vikas-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: >
+      npm install --include=dev &&
+      npm install --include=dev --prefix LandingPage && npm run build --prefix LandingPage &&
+      npm install --include=dev --prefix login && npm run build --prefix login &&
+      npm install --include=dev --prefix Registration && npm run build --prefix Registration &&
+      npm install --include=dev --prefix dashboard && npm run build --prefix dashboard &&
+      rm -rf LandingPage/dist/login LandingPage/dist/registration LandingPage/dist/dashboard &&
+      cp -r login/dist LandingPage/dist/login &&
+      cp -r Registration/dist LandingPage/dist/registration &&
+      cp -r dashboard/dist LandingPage/dist/dashboard
+    staticPublishPath: LandingPage/dist
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: VITE_API_BASE_URL
+        value: ""
+    routes:
+      # Proxy API calls to the backend service (replace URL once backend is live if needed)
+      - type: rewrite
+        source: /api/*
+        destination: https://hunar-vikas-api.onrender.com/api/*
+      # SPA fallbacks for sub-apps
+      - type: rewrite
+        source: /login/*
+        destination: /login/index.html
+      - type: rewrite
+        source: /registration/*
+        destination: /registration/index.html
+      - type: rewrite
+        source: /dashboard/*
+        destination: /dashboard/index.html
